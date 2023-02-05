@@ -6,7 +6,7 @@
   "packageManager": "yarn@3.3.1",
   "scripts": {
     "build": "tsc",
-    "publish": "yarn build"
+    "publish": "yarn build && npm publish"
   },
   "devDependencies": {
     "@types/figlet": "^1.5.5",
