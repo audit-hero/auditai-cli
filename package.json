@@ -1,6 +1,6 @@
 {
   "name": "auditai",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "main": "./dist/app.js",
   "bin": "./dist/app.js",
   "packageManager": "yarn@3.3.1",
