@@ -96,7 +96,16 @@ const parseContracts = (config: Config) => {
   // find the upmost directory with no files in it
 
   // make a list of paths from all of the files
-  removeEmptyPath(files, zip);
+  try {
+    removeEmptyPath(files, zip);
+  } catch (e:any) {
+    Logger.info(
+      `---
+Path parsing error: ${e} ${e.stack}
+
+AuditAI might not show correct folder structure. Please report your project file structure and auditai.txt at https://github.com/audit-hero/auditai-cli/issues
+---`)
+  }
 
   var data = zip.generate({ base64: false, compression: 'DEFLATE' });
   fs.writeFileSync('audit-ai.zip', data, 'binary');
@@ -126,7 +135,9 @@ try {
 
 parseContracts(config)
 
-function removeEmptyPath(files: { path: string; data: Buffer; }[], zip: any) {
+function removeEmptyPath(files: { path: string; data: Buffer; }[], zip: any) { 
+  if (files.length === 1) return
+
   let paths = files.map(it => it.path.split("/"));
 
   // find the path parts that all of the files have in common
@@ -159,4 +170,3 @@ function removeEmptyPath(files: { path: string; data: Buffer; }[], zip: any) {
     zip.file(it.path, it.data);
   });
 }
-
