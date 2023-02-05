@@ -98,7 +98,7 @@ const parseContracts = (config: Config) => {
   // make a list of paths from all of the files
   try {
     removeEmptyPath(files, zip);
-  } catch (e:any) {
+  } catch (e: any) {
     Logger.info(
       `---
 Path parsing error: ${e} ${e.stack}
@@ -135,7 +135,7 @@ try {
 
 parseContracts(config)
 
-function removeEmptyPath(files: { path: string; data: Buffer; }[], zip: any) { 
+function removeEmptyPath(files: { path: string; data: Buffer; }[], zip: any) {
   if (files.length === 1) return
 
   let paths = files.map(it => it.path.split("/"));
