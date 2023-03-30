@@ -10,6 +10,14 @@ contracts:
 - ./src/testProject/contracts/vaults/**
 ```
 
+## options
+
+```
+  .option("-md", "store the contracts by sorted LOC in a markdown file. Useful for creating a checklist about which contracts need to be audited.")
+  .option("-scm", "store the sorted contracts with solidity-code-metrics. Get useful information about the contracts")
+  .option("-v", "output extra debugging")
+```
+
 ### run locally
 
 - cd $your_solidity_project
