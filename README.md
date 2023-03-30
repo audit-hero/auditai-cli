@@ -8,4 +8,4 @@
 
 ### publish
 update version and
-`yarn publish`
+`yarn build && yarn publish`

@@ -5,6 +5,8 @@ import * as fs from "fs";
 const maxAuditAiProjectContracts = 100
 import glob from "glob"
 import Logger from "js-logger";
+import { removeEmptyPathAndAddToZip } from "./pathParser";
+import { exec } from "child_process";
 
 let configFileDesc = `"auditai.txt" file needs to contain contracts with format:
 ./src/contracts/contract1.sol
@@ -18,15 +20,16 @@ program
 ${configFileDesc}
 `)
   .option("-md", "store the contracts by sorted LOC in a markdown file")
+  .option("-scm", "store the sorted contracts with solidity-code-metrics")
   .option("-v", "output extra debugging")
   .parse(process.argv)
 
 Logger.useDefaults();
+Logger.setLevel(Logger.INFO);
 
 if (program.opts().v) {
   Logger.setLevel(Logger.DEBUG);
-} else {
-  Logger.setLevel(Logger.INFO);
+  Logger.debug("Debugging enabled");
 }
 
 const options = program.opts();
@@ -35,7 +38,7 @@ type Config = {
   lines: string[];
 }
 
-const parseContracts = (config: Config) => {
+export const parseContracts = (config: Config) => {
   type FileWithLength = {
     file: string,
     length: number
@@ -68,7 +71,7 @@ const parseContracts = (config: Config) => {
         files.push({ path: file, data: fileContent })
       }
       else {
-        Logger.debug(`Skipping ${file} because the maximum number of contracts is ${maxAuditAiProjectContracts}`)
+        Logger.info(`Skipping ${file} because the maximum number of contracts is ${maxAuditAiProjectContracts}`)
       }
     })
   })
@@ -77,9 +80,13 @@ const parseContracts = (config: Config) => {
   let linesLength = 0
   let sorted = fileMetaBuilder.sort((it, next) => next.length - it.length)
   sorted.forEach(it => {
-    fileContent += `- ${it.file}: ${it.length}\n\n`
+    fileContent += `- [ ] ${it.file}: ${it.length}\n\n`
     linesLength += it.length
   })
+
+  if (files.length === 0) {
+    throw Error("No files found. Check your auditai.txt")
+  }
 
   Logger.info("\nSummary:")
   Logger.info(`Files parsed: ${fileCount}`);
@@ -93,23 +100,35 @@ const parseContracts = (config: Config) => {
     Logger.info(`Saved sorted contracts to ${fileName}`)
   }
 
+
   // find the upmost directory with no files in it
 
   // make a list of paths from all of the files
-  try {
-    removeEmptyPath(files, zip);
-  } catch (e: any) {
-    Logger.info(
-      `---
-Path parsing error: ${e} ${e.stack}
-
-AuditAI might not show correct folder structure. Please report your project file structure and auditai.txt at https://github.com/audit-hero/auditai-cli/issues
----`)
-  }
+  removeEmptyPathAndAddToZip(files, zip);
 
   var data = zip.generate({ base64: false, compression: 'DEFLATE' });
   fs.writeFileSync('audit-ai.zip', data, 'binary');
   Logger.info("Saved AuditAI zip file to audit-ai.zip")
+
+  if (options.Scm) {
+    let fileName = "solidity-code-metrics.md"
+    Logger.info("Running solidity-code-metrics. This may take a while...")
+
+    exec(`solidity-code-metrics ${sorted.map(it => it.file).join(" ")}`, (error, stdout, stderr) => {
+      if (error) {
+        Logger.error(`error: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        Logger.error(`stderr: ${stderr}`);
+        return;
+      }
+
+      fs.writeFileSync(fileName, stdout)
+
+      Logger.info(`Saved solidity-code-metrics to ${fileName}`)
+    })
+  }
 }
 
 // get the js file and parse+zip the contracts
@@ -135,38 +154,3 @@ try {
 
 parseContracts(config)
 
-function removeEmptyPath(files: { path: string; data: Buffer; }[], zip: any) {
-  if (files.length === 1) return
-
-  let paths = files.map(it => it.path.split("/"));
-
-  // find the path parts that all of the files have in common
-  let notCommonPathFound = false;
-  let commonPath = [];
-  while (notCommonPathFound === false) {
-    let firstPath = paths[0];
-    let common = true;
-    for (let i = 0; i < paths.length; i++) {
-      if (paths[i][0] !== firstPath[0]) {
-        common = false;
-        break;
-      }
-    }
-
-    if (common) {
-      commonPath.push(firstPath[0]);
-      paths.forEach(it => it.splice(0, 1));
-    } else {
-      notCommonPathFound = true;
-    }
-  }
-
-  // remove that common part from all of the files
-  let commonPathLength = commonPath.length;
-  files.forEach(it => {
-    let path = it.path.split("/");
-    path.splice(0, commonPathLength);
-    it.path = path.join("/");
-    zip.file(it.path, it.data);
-  });
-}
