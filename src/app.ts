@@ -2,25 +2,25 @@
 
 const { Command } = require("commander"); // add this line
 import * as fs from "fs";
-const maxAuditAiProjectContracts = 100
-import glob from "glob"
+import { removeEmptyPathAndAddToZip } from "./pathParser"
+import { exec } from "child_process"
 import Logger from "js-logger";
-import { removeEmptyPathAndAddToZip } from "./pathParser";
-import { exec } from "child_process";
+import { Config, readContracts, readYamlFile } from "./files";
 
-let configFileDesc = `"auditai.txt" file needs to contain contracts with format:
-./src/contracts/contract1.sol
-./src/contracts/vaults/**/**
+let configFileDesc = `"auditai.yaml" file needs to contain contracts with format:
+contracts:
+- ./src/contracts/contract1.sol
+- ./src/contracts/vaults/**/**
 `
 const program = new Command();
 program
   .version(require('../package.json').version)
-  .description(`Audit Hero project parser. Parses files included in "auditai.txt" file into a .zip file that can be uploaded to AuditAI.
+  .description(`Audit Hero project parser. Parses files included in "auditai.yaml" file into a .zip file that can be uploaded to AuditAI.
 
 ${configFileDesc}
 `)
-  .option("-md", "store the contracts by sorted LOC in a markdown file")
-  .option("-scm", "store the sorted contracts with solidity-code-metrics")
+  .option("-md", "store the contracts by sorted LOC in a markdown file. Useful for creating a checklist about which contracts need to be audited.")
+  .option("-scm", "store the sorted contracts with solidity-code-metrics. Get useful information about the contracts")
   .option("-v", "output extra debugging")
   .parse(process.argv)
 
@@ -34,50 +34,13 @@ if (program.opts().v) {
 
 const options = program.opts();
 
-type Config = {
-  lines: string[];
-}
-
 export const parseContracts = (config: Config) => {
-  type FileWithLength = {
-    file: string,
-    length: number
-  }
-
-  let fileMetaBuilder: FileWithLength[] = []
-
-  var zip = new (require('node-zip'))();
-  var files: { path: string, data: Buffer }[] = []
-  let fileCount = 0
-
-  // get all files from contracts. get files from folders recursively
-  config.lines.forEach((it) => {
-    let globFiles = glob.sync(it)
-    fileCount += globFiles.length
-
-    globFiles.forEach((file) => {
-      if (file.endsWith(".sol") === false) {
-        Logger.debug(`Skipping ${file} because it is not a .sol file`)
-        return
-      }
-
-      let fileContent = fs.readFileSync(file)
-      fileMetaBuilder.push({
-        file: file,
-        length: fileContent.toString().split("\n").length
-      })
-
-      if (fileMetaBuilder.length < maxAuditAiProjectContracts) {
-        files.push({ path: file, data: fileContent })
-      }
-      else {
-        Logger.info(`Skipping ${file} because the maximum number of contracts is ${maxAuditAiProjectContracts}`)
-      }
-    })
-  })
-
   let fileContent = ""
   let linesLength = 0
+  var zip = new (require('node-zip'))();
+
+  let { fileCount, fileMetaBuilder, files } = readContracts(config)
+
   let sorted = fileMetaBuilder.sort((it, next) => next.length - it.length)
   sorted.forEach(it => {
     fileContent += `- [ ] ${it.file}: ${it.length}\n\n`
@@ -85,23 +48,23 @@ export const parseContracts = (config: Config) => {
   })
 
   if (files.length === 0) {
-    throw Error("No files found. Check your auditai.txt")
+    throw Error("No files found. Check your auditai.yaml")
   }
 
   Logger.info("\nSummary:")
   Logger.info(`Files parsed: ${fileCount}`);
   Logger.info(`Files ignored: ${fileCount - fileMetaBuilder.length}`);
   Logger.info(`Solidity files added: ${fileMetaBuilder.length}`);
-  Logger.info(`Total solidity LOC: ${linesLength}\n`);
+  Logger.info(`Total SLOC: ${linesLength}`);
+  Logger.info(`Price per SLOC: ${Math.round((config.prize_pool / linesLength) * 100) / 100}`)
 
+  Logger.info(`\n`)
+  
   if (options.Md) {
     let fileName = "audit-hero-contracts-sorted.md"
     fs.writeFileSync(fileName, fileContent)
     Logger.info(`Saved sorted contracts to ${fileName}`)
   }
-
-
-  // find the upmost directory with no files in it
 
   // make a list of paths from all of the files
   removeEmptyPathAndAddToZip(files, zip);
@@ -132,25 +95,5 @@ export const parseContracts = (config: Config) => {
 }
 
 // get the js file and parse+zip the contracts
-let config: Config
-try {
-  let contracts = fs.readFileSync("./auditai.txt").toString()
-  let lines = contracts.split("\n").reduce((acc, it) => {
-    if (it.trim() !== "") acc.push(it.trim())
-    return acc
-  }, [] as string[])
-
-  if (lines.length === 0) {
-    Logger.info(`auditait.txt lines length 0\n${contracts}\n${configFileDesc}`);
-    process.exit(1);
-  }
-  config = {
-    lines: lines
-  }
-} catch (e) {
-  Logger.info(`error ${JSON.stringify(e)}\n\n${configFileDesc}`);
-  process.exit(1);
-}
-
+let config = readYamlFile()
 parseContracts(config)
-

@@ -1,2 +1,0 @@
-./src/testProject/contracts/contract1.sol
-./src/testProject/contracts/vaults/**

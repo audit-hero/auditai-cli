@@ -1,0 +1,4 @@
+prize_pool: 164000
+contracts:
+- ./src/testProject/contracts/contract1.sol
+- ./src/testProject/contracts/vaults/**

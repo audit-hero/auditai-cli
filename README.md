@@ -1,5 +1,15 @@
 # auditai-cli
 
+### setup
+
+include file "auditai.yaml" in your project with contents:
+```
+prize_pool: 164000
+contracts:
+- ./src/testProject/contracts/contract1.sol
+- ./src/testProject/contracts/vaults/**
+```
+
 ### run locally
 
 - cd $your_solidity_project

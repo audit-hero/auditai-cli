@@ -1,5 +1,3 @@
-import Logger from "js-logger";
-
 export function removeEmptyPathAndAddToZip(files: { path: string; data: Buffer; }[], zip: any) {
   let paths = files.map(it => it.path.split("/"));
   // find the path parts that all of the files have in common
